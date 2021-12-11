@@ -11,6 +11,7 @@ thread_tptr pick = NULL;
 thread_tptr run = NULL;
 
 thread_tptr ready_head = NULL;
+thread_tptr ready_tail = NULL;
 thread_tptr wait_head = NULL;
 thread_tptr terminate_head = NULL;
 
@@ -20,31 +21,15 @@ int tq[3] = {300, 200, 100};//time quantum value, tq[0] = low priority's time qu
 //queue: H->H->...M->M->M...->L, previous H is earlier
 void ready_enq(thread_tptr *new_th)
 {
-    thread_tptr now_th = ready_head;
-    thread_tptr ex_th = NULL;
     if(ready_head!=NULL)
     {
-        while(now_th != NULL)
-        {
-            ex_th = now_th;
-            now_th = now_th->th_next;
-        }
-        ex_th->th_next = (*new_th);
-        (*new_th)->th_previous = ex_th;
-        (*new_th)->th_next = NULL;
+        ready_tail->th_next = (*new_th);
     }
     else//empty queue
     {
         ready_head = (*new_th);
-        ready_head->th_previous = ready_head->th_next = NULL;
     }
-    thread_tptr temp = ready_head;
-    while(temp!= NULL)
-    {
-        printf("%s ",temp->th_name);
-        temp = temp->th_next;
-    }
-    printf("\n");
+    ready_tail = (*new_th);
     return;
 }
 
@@ -94,7 +79,7 @@ void terminate_enq(thread_tptr *new_th)
     return;
 }
 
-thread_tptr deq(thread_tptr *head)
+thread_tptr deq(thread_tptr *head, thread_tptr *tail)
 {
     if((*head) == NULL)
         return NULL;
@@ -102,8 +87,8 @@ thread_tptr deq(thread_tptr *head)
     {
         thread_tptr leave = (*head);
         (*head) = (*head)->th_next;
-        (*head)->th_previous = NULL;
-        leave->th_next = leave->th_previous = NULL;
+        if((*head) == (*tail))
+            (*tail) = NULL;
         return leave;
     }
 }
@@ -369,40 +354,49 @@ void TimerHandler()
 
 void Report(int signal)
 {
-    printf("******************************************************************************************\n");
-    printf("*\tTID\tName\t\tState\tB_Priority\tC_Priority\tQ_Time\tW_time *\n");
-    thread_t *now = ready_head;
-    printf("*\t%d\t%s\t\tRUNNING\t%c\t%c\t\t%ld\t%ld *\n", run->th_id, run->th_name, priority_char[run->b_priority], priority_char[run->th_priority], run->th_qtime, run->th_wtime);
-    while(now!=NULL)
-    {
-        printf("*\t%d\t%s\t\tREADY\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
-        now = now->th_next;
-    }
-    now = wait_head;
-    while(now!=NULL)
-    {
-        printf("*\t%d\t%s\t\tWAITING\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
-        now = now->th_next;
-    }
-    printf("******************************************************************************************\n");
+    printf("\n");
+    printf("**************************************************************************************************\n");
+    printf("*\tTID\tName\t\tState\tB_Priority\tC_Priority\tQ_Time\t\tW_time\t *\n");
+    //thread_t *now = ready_head;
+    printf("*\t%d\t%s\t\tRUNNING\t%c\t%c\t\t%ld\t%ld\t *\n",
+           run->th_id, run->th_name, priority_char[run->b_priority], priority_char[run->th_priority], run->th_qtime, run->th_wtime);
+    //while(now!=NULL)
+    //{
+    //    printf("*\t%d\t%s\t\tREADY\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
+    //    now = now->th_next;
+    //}
+    //now = wait_head;
+    //while(now!=NULL)
+    //{
+    //    printf("*\t%d\t%s\t\tWAITING\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
+    //    now = now->th_next;
+    //}
+    printf("**************************************************************************************************\n");
     return;
 }
 
 void Scheduler()
 {
-    pick = deq(&ready_head);
+    pick = deq(&ready_head, &ready_tail);
 }
 
 void Dispatcher()
 {
     //haven't handle: begining
+    //thread_tptr temp = ready_head;
+    //while(temp!=NULL)
+    //{
+    //    printf("%s ", temp->th_name);
+    //    temp = temp->th_next;
+    //}
+    //printf("\n");
     Scheduler();
     run = pick;
     time_pass = 0;
-    if(ready_head == NULL)
-    {
-        printf("No thread to run, now run:%s\n", run->th_name);
-    }
+    //if(ready_head == NULL)
+    //{
+    //    printf("No thread to run, now run:%s\n", run->th_name);
+    //}
     ResetTimer();
     setcontext(&(run->th_ctx));
 }
@@ -427,7 +421,7 @@ void StartSchedulingSimulation()
     CreateContext(&finish_context, &dispatch_context, &FinishThread);
     //create thread
     OS2021_ThreadCreate("reclaimer", "ResourceReclaim", 0, 1);
-    ParsedJson();
+    //ParsedJson();
     setcontext(&dispatch_context);
 }
 
