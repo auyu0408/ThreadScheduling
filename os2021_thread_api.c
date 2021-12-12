@@ -351,15 +351,15 @@ void ParsedJson()
         //change priority into integer
         switch(json_object_get_string(priority)[0])
         {
-            case 'H':
-                p = 2;
-                break;
-            case 'M':
-                p = 1;
-                break;
-            default:
-                p = 0;
-                break;
+        case 'H':
+            p = 2;
+            break;
+        case 'M':
+            p = 1;
+            break;
+        default:
+            p = 0;
+            break;
         }
         //Create thread structure and enqueue
         q = OS2021_ThreadCreate(json_object_get_string(name), json_object_get_string(entry), p, json_object_get_int(cancel));

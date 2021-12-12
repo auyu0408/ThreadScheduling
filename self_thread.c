@@ -44,7 +44,7 @@ void enq(thread_tptr *new_th, thread_tptr *head)
         if(temp == NULL)
             temp_ex ->th_next = (*new_th);
     }
-        else//empty queue
+    else//empty queue
     {
         (*head) = (*new_th);
         (*new_th)->th_next = NULL;
@@ -75,7 +75,7 @@ void priority_change(thread_tptr *target, int time_past, int tq)
         {
             (*target)->th_priority++;
             printf("The priority of thread %s is changed from %c to %c\n",
-            (*target)->th_name, c[(*target)->th_priority-1], c[(*target)->th_priority]);
+                   (*target)->th_name, c[(*target)->th_priority-1], c[(*target)->th_priority]);
         }
     }
     else
@@ -84,7 +84,7 @@ void priority_change(thread_tptr *target, int time_past, int tq)
         {
             (*target)->th_priority--;
             printf("The priority of thread %s is changed from %c to %c\n",
-            (*target)->th_name, c[(*target)->th_priority+1], c[(*target)->th_priority]);
+                   (*target)->th_name, c[(*target)->th_priority+1], c[(*target)->th_priority]);
         }
     }
     return;
