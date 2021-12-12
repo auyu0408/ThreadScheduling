@@ -27,10 +27,9 @@ struct thread
     int th_wait;//event I want wait, -1 = no waiting
     long th_qtime;//queueing time
     long th_wtime;//waiting time
-    long th_waittime;//if you meet ThreadWaitTime
+    long th_waittime;//if you need ThreadWaitTime
     long th_already_wait;
     ucontext_t th_ctx;//to save your context
-    struct thread *th_previous;
     struct thread *th_next;
 };
 typedef struct thread thread_t;

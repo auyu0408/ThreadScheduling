@@ -31,7 +31,6 @@ void enq(thread_tptr *new_th, thread_tptr *head)
     }
     else//empty queue
     {
-
         (*head) = (*new_th);
     }
     (*new_th)->th_next = NULL;
@@ -65,7 +64,6 @@ int OS2021_ThreadCreate(char *job_name, char *p_function, int priority, int canc
     new_th->th_waittime = 0;
     new_th->th_already_wait = 0;
     new_th->th_next = NULL;
-    new_th->th_previous = NULL;
 
     if(strcmp(p_function, "Function1") == 0)
         CreateContext(&(new_th->th_ctx), &finish_context, &Function1);
@@ -136,7 +134,14 @@ void OS2021_ThreadCancel(char *job_name)
         if(target->th_cancelmode == 0)
         {
             //dequeue from original queue
-            ex_th->th_next = target->th_next;
+            if(target == wait_head)
+            {
+                wait_head = target->th_next;
+            }
+            else
+            {
+                ex_th->th_next = target->th_next;
+            }
             enq(&target, &terminate_head);//enqueue to terminate queue
             //no need to reschedule
         }
@@ -220,7 +225,8 @@ void OS2021_ThreadSetEvent(int event_id)
 void OS2021_ThreadWaitTime(int msec)
 {
     thread_t *target = run;
-    target->th_waittime = msec*10;
+    target->th_waittime = msec;
+    target->th_next = NULL;
     enq(&target, &wait_head);
     swapcontext(&(target->th_ctx), &dispatch_context);//save current status and reschedule
     return;
@@ -263,7 +269,7 @@ void CreateContext(ucontext_t *context, ucontext_t *next_context, void *func)
 void ResetTimer()
 {
     Signaltimer.it_value.tv_sec = 0;
-    Signaltimer.it_value.tv_usec = 10;
+    Signaltimer.it_value.tv_usec = 10000;
     if(setitimer(ITIMER_REAL, &Signaltimer, NULL) < 0)
     {
         printf("ERROR SETTING TIME SIGALRM!\n");
@@ -272,8 +278,10 @@ void ResetTimer()
 
 void TimerHandler()
 {
+    time_pass += 10;
     //calculate related time
     thread_tptr temp_th = ready_head;
+    thread_tptr ex_th = NULL;
     while(temp_th != NULL)
     {
         temp_th->th_qtime += 10;
@@ -284,20 +292,41 @@ void TimerHandler()
     while(temp_th != NULL)
     {
         temp_th->th_wtime += 10;
+        if(temp_th->th_waittime != 0)
+        {
+            thread_tptr target = temp_th;
+            thread_tptr target_ex = ex_th;
+            target->th_already_wait ++;
+            if(target->th_already_wait >= target->th_waittime)
+            {
+                target->th_waittime = 0;
+                target->th_already_wait = 0;
+                if(target == wait_head)
+                {
+                    wait_head = wait_head->th_next;
+                }
+                else
+                {
+                    target_ex->th_next = target->th_next;
+                }
+                enq(&target, &ready_head);
+            }
+        }
+        ex_th = temp_th;
         temp_th = temp_th->th_next;
     }
     //if time excess time quantum, change another thread
-    //if(time_pass >= tq[run->th_priority])
-    //{
-    //    //change priority
-    //    if(run->th_priority !=0)
-    //    {
-    //        run->th_priority--;
-    //        printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
-    //    }
-    enq(&run, &ready_head);//send it to ready queue
-    swapcontext(&(run->th_ctx), &dispatch_context);//reschedule
-    //}
+    if(time_pass >= tq[run->th_priority])
+    {
+        //change priority
+        if(run->th_priority !=0)
+        {
+            run->th_priority--;
+            printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
+        }
+        enq(&run, &ready_head);//send it to ready queue
+        swapcontext(&(run->th_ctx), &dispatch_context);//reschedule
+    }
     //if not execeed, keep going
     ResetTimer();
     return;
@@ -374,10 +403,8 @@ void StartSchedulingSimulation()
     CreateContext(&dispatch_context, NULL, &Dispatcher);
     CreateContext(&finish_context, &dispatch_context, &FinishThread);
     //create thread
-    OS2021_ThreadCreate("my_thread1", "Function1", 2, 1);
-    //OS2021_ThreadCreate("my_thread2", "Function5", 1, 1);
     OS2021_ThreadCreate("reclaimer", "ResourceReclaim", 0, 1);
-    //ParsedJson();
+    ParsedJson();
     setcontext(&dispatch_context);
 }
 
