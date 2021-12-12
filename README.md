@@ -36,6 +36,59 @@ make simulator
 make clean
 ```
 
+## Usage
+
+- execute simulator
+
+```bash
+./simulator
+```
+
+- Use `Ctrl`+`Z` to reports thread information 
+- Use `Ctrl`+`C` to terminate the process
+
+```bash
+f1 wants to waiting for event 3
+The priority of thread f1 is changed from M to H
+f3 wants to waiting for event 3
+The priority of thread f3 is changed from M to H
+^Z
+**************************************************************************************************
+*	TID	Name		State		B_Priority	C_Priority	Q_Time	W_time	 *
+*	0	reclaimer 	RUNNING		L		L		1200	0	 *
+*	3	random_1  	READY		L		L		1480	0	 *
+*	4	random_2  	READY		L		L		1480	0	 *
+*	1	f1        	WAITING		M		H		0	2080	 *
+*	2	f3        	WAITING		M		H		0	2080	 *
+**************************************************************************************************
+I found 65409.
+random_1 changes the status of f1 to READY.
+f1 wants to cancel thread random_1
+f1 wants to cancel thread random_2
+The priority of thread f1 is changed from H to M
+^Z
+**************************************************************************************************
+*	TID	Name		State		B_Priority	C_Priority	Q_Time	W_time	 *
+*	1	f1        	RUNNING		M		M		300	6600	 *
+*	4	random_2  	READY		L		L		5080	0	 *
+*	0	reclaimer 	READY		L		L		4780	0	 *
+*	3	random_1  	READY		L		L		4780	0	 *
+*	2	f3        	WAITING		M		H		0	7180	 *
+**************************************************************************************************
+The priority of thread f1 is changed from M to L
+The memory space by random_2 has been released.
+The memory space by random_1 has been released.
+^Z
+**************************************************************************************************
+*	TID	Name		State		B_Priority	C_Priority	Q_Time	W_time	 *
+*	0	reclaimer 	RUNNING		L		L		5400	0	 *
+*	1	f1        	READY		M		L		1120	6600	 *
+*	2	f3        	WAITING		M		H		0	8620	 *
+**************************************************************************************************
+^C
+```
+
+
 ## Implementations
 
 ### Structure In My Thread
