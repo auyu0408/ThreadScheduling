@@ -16,7 +16,7 @@ thread_tptr terminate_head = NULL;
 char priority_char[3] = {'L', 'M', 'H'};
 int tq[3] = {300, 200, 100};//time quantum value, tq[0] = low priority's time quantum
 
-int OS2021_ThreadCreate(char *job_name, char *p_function, int priority, int cancel_mode)
+int OS2021_ThreadCreate(char *job_name, char *p_function, char *priority, int cancel_mode)
 {
     thread_tptr new_th = create_thread(job_name, th_num, priority, cancel_mode);
     th_num++;
@@ -314,7 +314,7 @@ void StartSchedulingSimulation()
     CreateContext(&dispatch_context, NULL, &Dispatcher);
     CreateContext(&finish_context, &dispatch_context, &FinishThread);
     /*Create thread*/
-    OS2021_ThreadCreate("reclaimer", "ResourceReclaim", 0, 1);
+    OS2021_ThreadCreate("reclaimer", "ResourceReclaim", "L", 1);
     ParsedJson();
     /*Start Scheduling*/
     setcontext(&dispatch_context);
@@ -331,7 +331,6 @@ void ParsedJson()
     struct json_object *cancel;
     size_t n_thread;//size of Threads
     size_t i;
-    int p;//priority, in integer
     int q;//entry function error handler
 
     parsed_json = json_object_from_file("init_threads.json");
@@ -348,21 +347,8 @@ void ParsedJson()
         json_object_object_get_ex(thread, "priority", &priority);
         json_object_object_get_ex(thread, "cancel mode", &cancel);
 
-        //change priority into integer
-        switch(json_object_get_string(priority)[0])
-        {
-        case 'H':
-            p = 2;
-            break;
-        case 'M':
-            p = 1;
-            break;
-        default:
-            p = 0;
-            break;
-        }
         //Create thread structure and enqueue
-        q = OS2021_ThreadCreate(json_object_get_string(name), json_object_get_string(entry), p, json_object_get_int(cancel));
+        q = OS2021_ThreadCreate(json_object_get_string(name), json_object_get_string(entry), json_object_get_string(priority), json_object_get_int(cancel));
         if(q == -1)
             printf("Incorrect entry function.\n");
     }

@@ -1,11 +1,26 @@
 #include "self_thread.h"
 
-thread_tptr create_thread(char *job_name, int th_id, int priority, int cancel_mode)
+thread_tptr create_thread(char *job_name, int th_id, char *priority, int cancel_mode)
 {
+    //change priority into integer
+    int p;
+    switch(priority[0])
+    {
+    case 'H':
+        p = 2;
+        break;
+    case 'M':
+        p = 1;
+        break;
+    default:
+        p = 0;
+        break;
+    }
+
     thread_t *new_th = malloc(sizeof(thread_t));
     new_th->th_name = job_name;
     new_th->th_id = th_id;//th_id = th_num(original), th_num = th_num+1
-    new_th->b_priority = new_th->th_priority = priority;
+    new_th->b_priority = new_th->th_priority = p;
     new_th->th_cancelmode = cancel_mode;
     new_th->th_cancel_status = 0;
     new_th->th_wait = -1;

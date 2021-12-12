@@ -28,7 +28,7 @@ typedef struct thread * thread_tptr;
 /*multilevel feedback queue*/
 void enq(thread_tptr *, thread_tptr *);
 thread_tptr deq(thread_tptr *);
-thread_tptr create_thread(char *, int, int, int);
+thread_tptr create_thread(char *, int, char *, int);
 void priority_change(thread_tptr *, int, int);
 
 #endif
