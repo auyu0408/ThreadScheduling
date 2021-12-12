@@ -71,10 +71,8 @@ make clean
   - If their priority is different, high priority serve first
   - Else, first come first serve
 
-- If the input order is: 1.L 2.H 3.M 4.M 5.H 6.L, the thread in queue be like:  
-|Head|2|5|3|4|1|6|  
-|----|-|-|-|-|-|-|  
-|x   |H|H|M|M|L|L|  
+- If the input order is: 1.L 2.H 3.M 4.M 5.H 6.L, the thread in queue be like:   
+Head -> 2 -> 5 -> 3 -> 4 -> 1 -> 6  
 
 ## References
 
