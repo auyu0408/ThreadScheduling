@@ -4,12 +4,13 @@ void Function1(void)
 {
     while(1)
     {
-        OS2021_ThreadCreate("random_1","Function2",2,1);
-        OS2021_ThreadCreate("random_2","Function2",2,1);
-        OS2021_ThreadWaitEvent(3);
-        OS2021_ThreadCancel("random_1");
-        OS2021_ThreadCancel("random_2");
-        while(1);
+        //OS2021_ThreadCreate("random_1","Function2",2,0);
+        //OS2021_ThreadCreate("random_2","Function2",2,1);
+        //OS2021_ThreadWaitEvent(3);
+        //OS2021_ThreadCancel("random_1");
+        //OS2021_ThreadCancel("random_2");
+        fprintf(stdout, "1\n");
+        fflush(stdout);
     }
 }
 
@@ -73,5 +74,7 @@ void ResourceReclaim(void)
     while(1)
     {
         OS2021_DeallocateThreadResource();
+        fprintf(stdout, "6\n");
+        fflush(stdout);
     }
 }

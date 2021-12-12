@@ -11,7 +11,6 @@ thread_tptr pick = NULL;
 thread_tptr run = NULL;
 
 thread_tptr ready_head = NULL;
-thread_tptr ready_tail = NULL;
 thread_tptr wait_head = NULL;
 thread_tptr terminate_head = NULL;
 
@@ -19,67 +18,27 @@ char priority_char[3] = {'L', 'M', 'H'};
 int tq[3] = {300, 200, 100};//time quantum value, tq[0] = low priority's time quantum
 
 //queue: H->H->...M->M->M...->L, previous H is earlier
-void ready_enq(thread_tptr *new_th)
+void enq(thread_tptr *new_th, thread_tptr *head)
 {
-    if(ready_head!=NULL)
+    thread_tptr temp = (*head);
+    if(temp!=NULL)
     {
-        ready_tail->th_next = (*new_th);
-    }
-    else//empty queue
-    {
-        ready_head = (*new_th);
-    }
-    ready_tail = (*new_th);
-    return;
-}
-
-void wait_enq(thread_tptr *new_th)
-{
-    thread_tptr now_th = wait_head;
-    thread_tptr ex_th = NULL;
-    if(wait_head!=NULL)
-    {
-        while(now_th != NULL)
+        while(temp->th_next != NULL)
         {
-            ex_th = now_th;
-            now_th = now_th->th_next;
+            temp = temp->th_next;
         }
-        ex_th->th_next = (*new_th);
-        (*new_th)->th_previous = ex_th;
-        (*new_th)->th_next = NULL;
+        temp ->th_next = (*new_th);
     }
     else//empty queue
     {
-        wait_head = (*new_th);
-        wait_head->th_previous = wait_head->th_next = NULL;
+
+        (*head) = (*new_th);
     }
+    (*new_th)->th_next = NULL;
     return;
 }
 
-void terminate_enq(thread_tptr *new_th)
-{
-    thread_tptr now_th = terminate_head;
-    thread_tptr ex_th = NULL;
-    if(terminate_head!=NULL)
-    {
-        while(now_th != NULL)
-        {
-            ex_th = now_th;
-            now_th = now_th->th_next;
-        }
-        ex_th->th_next = (*new_th);
-        (*new_th)->th_next = NULL;
-        (*new_th)->th_previous = ex_th;
-    }
-    else//empty queue
-    {
-        terminate_head = (*new_th);
-        terminate_head->th_previous = terminate_head->th_next = NULL;
-    }
-    return;
-}
-
-thread_tptr deq(thread_tptr *head, thread_tptr *tail)
+thread_tptr deq(thread_tptr *head)
 {
     if((*head) == NULL)
         return NULL;
@@ -87,8 +46,7 @@ thread_tptr deq(thread_tptr *head, thread_tptr *tail)
     {
         thread_tptr leave = (*head);
         (*head) = (*head)->th_next;
-        if((*head) == (*tail))
-            (*tail) = NULL;
+        leave->th_next = NULL;
         return leave;
     }
 }
@@ -127,40 +85,49 @@ int OS2021_ThreadCreate(char *job_name, char *p_function, int priority, int canc
         return -1;
     }
 
-    ready_enq(&new_th);
+    enq(&new_th, &ready_head);
     return new_th->th_id;
 }
 
 void OS2021_ThreadCancel(char *job_name)
 {
-    thread_t *target = NULL;
-    thread_t *now = ready_head;
+    thread_tptr target = NULL;
+    thread_tptr temp_th = ready_head;
+    thread_tptr ex_th = NULL;
     //reclaimer can't enter terminate state
     if(strcmp("reclaimer", job_name)==0)
         return;
-    //tried to find target
-    while (now!=NULL)
+    //tried to find target in ready queue
+    while (temp_th!=NULL)
     {
-        if(strcmp(now->th_name, job_name)==0)
+        if(strcmp(temp_th->th_name, job_name)==0)
         {
-            target = now;
+            target = temp_th;
             break;
         }
         else
-            now = now->th_next;
+        {
+            ex_th = temp_th;
+            temp_th = temp_th->th_next;
+        }
     }
+    //tried to find target in wait queue
     if(target == NULL)
     {
-        now = wait_head;
-        while(now != NULL)
+        temp_th = wait_head;
+        ex_th = NULL;
+        while(temp_th != NULL)
         {
-            if(strcmp(now->th_name, job_name) == 0)
+            if(strcmp(temp_th->th_name, job_name) == 0)
             {
-                target = now;
+                target = temp_th;
                 break;
             }
             else
-                now = now->th_next;
+            {
+                ex_th = temp_th;
+                temp_th = temp_th->th_next;
+            }
         }
     }
     //after find target, move it to terminate queue or change state
@@ -169,9 +136,8 @@ void OS2021_ThreadCancel(char *job_name)
         if(target->th_cancelmode == 0)
         {
             //dequeue from original queue
-            target->th_previous->th_next = target->th_next;
-            target->th_next->th_previous = target->th_previous;
-            terminate_enq(&target);//enqueue to terminate queue
+            ex_th->th_next = target->th_next;
+            enq(&target, &terminate_head);//enqueue to terminate queue
             //no need to reschedule
         }
         else
@@ -210,7 +176,7 @@ void OS2021_ThreadWaitEvent(int event_id)
     }
 
     //change to wait queue
-    wait_enq(&target);
+    enq(&target, &wait_head);
     printf("%s wants to waiting for event %d\n", target->th_name, event_id);
     swapcontext(&(target->th_ctx), &dispatch_context);//save current status and reschedule
     return;
@@ -218,29 +184,33 @@ void OS2021_ThreadWaitEvent(int event_id)
 
 void OS2021_ThreadSetEvent(int event_id)
 {
-    thread_t *bullet_th = run;
-    thread_t *hit_th = NULL;
-    thread_t *now_th = wait_head;
+    thread_tptr bullet_th = run;
+    thread_tptr hit_th = NULL;
+    thread_tptr temp_th = wait_head;
+    thread_tptr ex_th = NULL;
     //try to find target
-    while(now_th != NULL)
+    while(temp_th != NULL)
     {
-        if(now_th->th_wait != event_id)
-            now_th = now_th->th_next;
+        if(temp_th->th_wait != event_id)
+        {
+            ex_th = temp_th;
+            temp_th = temp_th->th_next;
+        }
         else
         {
-            hit_th = now_th;
+            hit_th = temp_th;
             hit_th->th_wait = -1;
             if(hit_th == wait_head)
+            {
                 wait_head = wait_head->th_next;
+            }
             else
             {
-                hit_th->th_previous->th_next = hit_th->th_next;
-                if(hit_th->th_next != NULL)
-                    hit_th->th_next->th_previous = hit_th->th_previous;
+                ex_th->th_next = hit_th->th_next;
+                hit_th->th_next = NULL;
             }
             printf("%s changes the status of %s to READY.\n", bullet_th->th_name, hit_th->th_name);
-            ready_enq(&hit_th);
-            now_th = ready_head;
+            enq(&hit_th, &ready_head);
             return;
         }
     }
@@ -251,7 +221,7 @@ void OS2021_ThreadWaitTime(int msec)
 {
     thread_t *target = run;
     target->th_waittime = msec*10;
-    wait_enq(&target);
+    enq(&target, &wait_head);
     swapcontext(&(target->th_ctx), &dispatch_context);//save current status and reschedule
     return;
 }
@@ -273,7 +243,7 @@ void OS2021_TestCancel()
     thread_t *target = run;
     if(target->th_cancel_status == 1)//change when it was cancel by somebody
     {
-        terminate_enq(&target);//change to terminate state
+        enq(&target, &terminate_head);//change to terminate state
         setcontext(&dispatch_context);//reschedule
     }
     else
@@ -303,50 +273,31 @@ void ResetTimer()
 void TimerHandler()
 {
     //calculate related time
-    thread_t *now = ready_head;
-    while(now != NULL)
+    thread_tptr temp_th = ready_head;
+    while(temp_th != NULL)
     {
-        now->th_qtime += 10;
-        now = now->th_next;
+        temp_th->th_qtime += 10;
+        temp_th = temp_th->th_next;
     }
-    now = wait_head;
-    while(now != NULL)
+    // add wait time
+    temp_th = wait_head;
+    while(temp_th != NULL)
     {
-        now->th_wtime += 10;
-        thread_t *target = now;
-        now = now->th_next;
-        if(target->th_waittime != 0)
-        {
-            target->th_already_wait += 10;
-            if(target->th_already_wait >= target->th_waittime)
-            {
-                if(target != wait_head)
-                {
-                    target->th_previous->th_next = target->th_next;
-                }
-                if(target->th_next != NULL)
-                {
-                    target->th_next->th_previous = target->th_previous;
-                }
-                ready_enq(&target);//change to ready state
-                target->th_already_wait = 0;//reset waitting variable
-                target->th_waittime = 0;
-            }
-        }
+        temp_th->th_wtime += 10;
+        temp_th = temp_th->th_next;
     }
-    time_pass += 10;
     //if time excess time quantum, change another thread
-    if(time_pass >= tq[run->th_priority])
-    {
-        //change priority
-        if(run->th_priority !=0)
-        {
-            run->th_priority--;
-            printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
-        }
-        ready_enq(&run);//send it to ready queue
-        swapcontext(&(run->th_ctx), &dispatch_context);//save current statement and reschedule
-    }
+    //if(time_pass >= tq[run->th_priority])
+    //{
+    //    //change priority
+    //    if(run->th_priority !=0)
+    //    {
+    //        run->th_priority--;
+    //        printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
+    //    }
+    enq(&run, &ready_head);//send it to ready queue
+    swapcontext(&(run->th_ctx), &dispatch_context);//reschedule
+    //}
     //if not execeed, keep going
     ResetTimer();
     return;
@@ -356,28 +307,30 @@ void Report(int signal)
 {
     printf("\n");
     printf("**************************************************************************************************\n");
-    printf("*\tTID\tName\t\tState\tB_Priority\tC_Priority\tQ_Time\t\tW_time\t *\n");
-    //thread_t *now = ready_head;
-    printf("*\t%d\t%s\t\tRUNNING\t%c\t%c\t\t%ld\t%ld\t *\n",
+    printf("*\tTID\tName\t\tState\t\tB_Priority\tC_Priority\tQ_Time\tW_time\t *\n");
+    printf("*\t%d\t%s\tRUNNING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
            run->th_id, run->th_name, priority_char[run->b_priority], priority_char[run->th_priority], run->th_qtime, run->th_wtime);
-    //while(now!=NULL)
-    //{
-    //    printf("*\t%d\t%s\t\tREADY\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
-    //    now = now->th_next;
-    //}
-    //now = wait_head;
-    //while(now!=NULL)
-    //{
-    //    printf("*\t%d\t%s\t\tWAITING\t%c\t%c\t\t%ld\t%ld *\n", now->th_id, now->th_name, priority_char[now->b_priority], priority_char[now->th_priority], now->th_qtime, now->th_wtime);
-    //    now = now->th_next;
-    //}
+    thread_tptr temp_th = ready_head;
+    while(temp_th!=NULL)
+    {
+        printf("*\t%d\t%s\tREADY\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
+               temp_th->th_id, temp_th->th_name, priority_char[temp_th->b_priority], priority_char[temp_th->th_priority], temp_th->th_qtime, temp_th->th_wtime);
+        temp_th = temp_th->th_next;
+    }
+    temp_th = wait_head;
+    while(temp_th!=NULL)
+    {
+        printf("*\t%d\t%s\tWAITING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
+               temp_th->th_id, temp_th->th_name, priority_char[temp_th->b_priority], priority_char[temp_th->th_priority], temp_th->th_qtime, temp_th->th_wtime);
+        temp_th = temp_th->th_next;
+    }
     printf("**************************************************************************************************\n");
     return;
 }
 
 void Scheduler()
 {
-    pick = deq(&ready_head, &ready_tail);
+    pick = deq(&ready_head);
 }
 
 void Dispatcher()
@@ -390,6 +343,7 @@ void Dispatcher()
     //    temp = temp->th_next;
     //}
     //printf("\n");
+    run = NULL;
     Scheduler();
     run = pick;
     time_pass = 0;
@@ -405,14 +359,14 @@ void FinishThread()
 {
     thread_tptr target = run;
     run = NULL;
-    terminate_enq(&target);//change from run to terminate state
+    enq(&target, &terminate_head);//change from run to terminate state
     setcontext(&dispatch_context);//reschedule
 }
 
 void StartSchedulingSimulation()
 {
     /*Set Timer*/
-    Signaltimer.it_interval.tv_usec = 10;
+    Signaltimer.it_interval.tv_usec = 100;
     Signaltimer.it_interval.tv_sec = 0;
     signal(SIGALRM, TimerHandler);
     signal(SIGTSTP, Report);
@@ -420,6 +374,8 @@ void StartSchedulingSimulation()
     CreateContext(&dispatch_context, NULL, &Dispatcher);
     CreateContext(&finish_context, &dispatch_context, &FinishThread);
     //create thread
+    OS2021_ThreadCreate("my_thread1", "Function1", 2, 1);
+    //OS2021_ThreadCreate("my_thread2", "Function5", 1, 1);
     OS2021_ThreadCreate("reclaimer", "ResourceReclaim", 0, 1);
     //ParsedJson();
     setcontext(&dispatch_context);

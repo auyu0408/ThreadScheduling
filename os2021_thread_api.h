@@ -36,7 +36,7 @@ struct thread
 typedef struct thread thread_t;
 typedef struct thread * thread_tptr;
 
-void ready_enq(thread_tptr *);
+void enq(thread_tptr *, thread_tptr *);
 void Timer_Handler();
 void Scheduler();
 
