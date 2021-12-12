@@ -1,84 +1,25 @@
 #include "os2021_thread_api.h"
 
 struct itimerval Signaltimer;
-ucontext_t dispatch_context;
-//ucontext_t timer_context;
-ucontext_t finish_context;//if entry function will goto end, this will be used.
-int th_num = 0;//use for set thread_id
-long time_pass = 0;//used to compare with time quantum
+ucontext_t dispatch_context;//dispatcher context
+ucontext_t finish_context;//if function will goto end.
+int th_num = 0;//total thread_id
+long time_past = 0;//time quantum
 
-thread_tptr pick = NULL;
 thread_tptr run = NULL;
-
+/*priority feedback queue head*/
 thread_tptr ready_head = NULL;
 thread_tptr wait_head = NULL;
 thread_tptr terminate_head = NULL;
 
+/*priority parameter*/
 char priority_char[3] = {'L', 'M', 'H'};
 int tq[3] = {300, 200, 100};//time quantum value, tq[0] = low priority's time quantum
 
-//queue: H->H->...M->M->M...->L, previous H is earlier
-void enq(thread_tptr *new_th, thread_tptr *head)
-{
-    thread_tptr temp = (*head);
-    thread_tptr temp_ex = NULL;
-    if(temp!=NULL)
-    {
-        while(temp != NULL)
-        {
-            if(temp->th_priority >= (*new_th)->th_priority)
-            {
-                temp_ex = temp;
-                temp = temp->th_next;
-            }
-            else
-            {
-                (*new_th)->th_next = temp;
-                if(temp != (*head))
-                    temp_ex->th_next = (*new_th);
-                else
-                    (*head) = (*new_th);
-                break;
-            }
-        }
-        if(temp == NULL)
-            temp_ex ->th_next = (*new_th);
-    }
-    else//empty queue
-    {
-        (*head) = (*new_th);
-        (*new_th)->th_next = NULL;
-    }
-    return;
-}
-
-thread_tptr deq(thread_tptr *head)
-{
-    if((*head) == NULL)
-        return NULL;
-    else
-    {
-        thread_tptr leave = (*head);
-        (*head) = (*head)->th_next;
-        leave->th_next = NULL;
-        return leave;
-    }
-}
-
 int OS2021_ThreadCreate(char *job_name, char *p_function, int priority, int cancel_mode)
 {
-    thread_t *new_th = malloc(sizeof(thread_t));
-    new_th->th_name = job_name;
-    new_th->th_id = th_num++;//th_id = th_num(original), th_num = th_num+1
-    new_th->b_priority = new_th->th_priority = priority;
-    new_th->th_cancelmode = cancel_mode;
-    new_th->th_cancel_status = 0;
-    new_th->th_wait = -1;
-    new_th->th_qtime = 0;
-    new_th->th_wtime = 0;
-    new_th->th_waittime = 0;
-    new_th->th_already_wait = 0;
-    new_th->th_next = NULL;
+    thread_tptr new_th = create_thread(job_name, th_num, priority, cancel_mode);
+    th_num++;
 
     if(strcmp(p_function, "Function1") == 0)
         CreateContext(&(new_th->th_ctx), &finish_context, &Function1);
@@ -107,10 +48,10 @@ void OS2021_ThreadCancel(char *job_name)
     thread_tptr target = NULL;
     thread_tptr temp_th = ready_head;
     thread_tptr ex_th = NULL;
-    //reclaimer can't enter terminate state
     if(strcmp("reclaimer", job_name)==0)
-        return;
-    //tried to find target in ready queue
+        return;//reclaimer can't enter terminate state
+
+    /*tried to find target in ready queue or wait queue */
     while (temp_th!=NULL)
     {
         if(strcmp(temp_th->th_name, job_name)==0)
@@ -124,7 +65,6 @@ void OS2021_ThreadCancel(char *job_name)
             temp_th = temp_th->th_next;
         }
     }
-    //tried to find target in wait queue
     if(target == NULL)
     {
         temp_th = wait_head;
@@ -143,28 +83,22 @@ void OS2021_ThreadCancel(char *job_name)
             }
         }
     }
-    //after find target, move it to terminate queue or change state
+    /*if find target, move it to terminate queue or change state*/
     if(target != NULL)
     {
         if(target->th_cancelmode == 0)
         {
-            //dequeue from original queue
+            /*dequeue from original queue*/
             if(target == wait_head)
-            {
                 wait_head = target->th_next;
-            }
             else
-            {
                 ex_th->th_next = target->th_next;
-            }
             enq(&target, &terminate_head);//enqueue to terminate queue
-            //no need to reschedule
         }
         else
         {
             target->th_cancel_status = 1;//change cancel state but not goto terminate now, wait for cancel point
             printf("%s wants to cancel thread %s\n", run->th_name, target->th_name);
-            //no need to reschedule
         }
     }
     return;
@@ -174,30 +108,9 @@ void OS2021_ThreadWaitEvent(int event_id)
 {
     thread_t *target = run;
     target->th_wait = event_id;
-
-    //change priority
-    if(time_pass < tq[target->th_priority])
-    {
-        if(target->th_priority != 2)
-        {
-            target->th_priority++;
-            printf("The priority of thread %s is changed from %c to %c\n",
-                   target->th_name, priority_char[target->th_priority-1], priority_char[target->th_priority]);
-        }
-    }
-    else
-    {
-        if(target->th_priority != 0)
-        {
-            target->th_priority--;
-            printf("The priority of thread %s is changed from %c to %c\n",
-                   target->th_name, priority_char[target->th_priority+1], priority_char[target->th_priority]);
-        }
-    }
-
-    //change to wait queue
-    enq(&target, &wait_head);
     printf("%s wants to waiting for event %d\n", target->th_name, event_id);
+    priority_change(&target, time_past, tq[target->th_priority]);//change priority
+    enq(&target, &wait_head);//change to wait queue
     swapcontext(&(target->th_ctx), &dispatch_context);//save current status and reschedule
     return;
 }
@@ -221,9 +134,7 @@ void OS2021_ThreadSetEvent(int event_id)
             hit_th = temp_th;
             hit_th->th_wait = -1;
             if(hit_th == wait_head)
-            {
                 wait_head = wait_head->th_next;
-            }
             else
             {
                 ex_th->th_next = hit_th->th_next;
@@ -240,6 +151,7 @@ void OS2021_ThreadSetEvent(int event_id)
 void OS2021_ThreadWaitTime(int msec)
 {
     thread_t *target = run;
+    priority_change(&target, time_past, tq[target->th_priority]);
     target->th_waittime = msec;
     target->th_next = NULL;
     enq(&target, &wait_head);
@@ -252,6 +164,7 @@ void OS2021_DeallocateThreadResource()
     thread_tptr target = terminate_head;
     while(target != NULL)
     {
+        printf("The memory space by %s has been released.\n", target->th_name);
         terminate_head = terminate_head->th_next;
         free(target);
         target = terminate_head;
@@ -293,7 +206,7 @@ void ResetTimer()
 
 void TimerHandler()
 {
-    time_pass += 10;
+    time_past += 10;
     //calculate related time
     thread_tptr temp_th = ready_head;
     thread_tptr ex_th = NULL;
@@ -317,13 +230,9 @@ void TimerHandler()
                 target->th_waittime = 0;
                 target->th_already_wait = 0;
                 if(target == wait_head)
-                {
                     wait_head = wait_head->th_next;
-                }
                 else
-                {
                     target_ex->th_next = target->th_next;
-                }
                 enq(&target, &ready_head);
             }
         }
@@ -331,7 +240,7 @@ void TimerHandler()
         temp_th = temp_th->th_next;
     }
     //if time excess time quantum, change another thread
-    if(time_pass >= tq[run->th_priority])
+    if(time_past >= tq[run->th_priority])
     {
         //change priority
         if(run->th_priority !=0)
@@ -352,19 +261,19 @@ void Report(int signal)
     printf("\n");
     printf("**************************************************************************************************\n");
     printf("*\tTID\tName\t\tState\t\tB_Priority\tC_Priority\tQ_Time\tW_time\t *\n");
-    printf("*\t%d\t%s\tRUNNING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
+    printf("*\t%d\t%-10s\tRUNNING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
            run->th_id, run->th_name, priority_char[run->b_priority], priority_char[run->th_priority], run->th_qtime, run->th_wtime);
     thread_tptr temp_th = ready_head;
     while(temp_th!=NULL)
     {
-        printf("*\t%d\t%s\tREADY\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
+        printf("*\t%d\t%-10s\tREADY\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
                temp_th->th_id, temp_th->th_name, priority_char[temp_th->b_priority], priority_char[temp_th->th_priority], temp_th->th_qtime, temp_th->th_wtime);
         temp_th = temp_th->th_next;
     }
     temp_th = wait_head;
     while(temp_th!=NULL)
     {
-        printf("*\t%d\t%s\tWAITING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
+        printf("*\t%d\t%-10s\tWAITING\t\t%c\t\t%c\t\t%ld\t%ld\t *\n",
                temp_th->th_id, temp_th->th_name, priority_char[temp_th->b_priority], priority_char[temp_th->th_priority], temp_th->th_qtime, temp_th->th_wtime);
         temp_th = temp_th->th_next;
     }
@@ -374,27 +283,14 @@ void Report(int signal)
 
 void Scheduler()
 {
-    pick = deq(&ready_head);
+    run = deq(&ready_head);
 }
 
 void Dispatcher()
 {
-    //haven't handle: begining
-    //thread_tptr temp = ready_head;
-    //while(temp!=NULL)
-    //{
-    //    printf("%s ", temp->th_name);
-    //    temp = temp->th_next;
-    //}
-    //printf("\n");
     run = NULL;
     Scheduler();
-    run = pick;
-    time_pass = 0;
-    //if(ready_head == NULL)
-    //{
-    //    printf("No thread to run, now run:%s\n", run->th_name);
-    //}
+    time_past = 0;
     ResetTimer();
     setcontext(&(run->th_ctx));
 }
@@ -417,16 +313,17 @@ void StartSchedulingSimulation()
     /*Create Context*/
     CreateContext(&dispatch_context, NULL, &Dispatcher);
     CreateContext(&finish_context, &dispatch_context, &FinishThread);
-    //create thread
+    /*Create thread*/
     OS2021_ThreadCreate("reclaimer", "ResourceReclaim", 0, 1);
     ParsedJson();
+    /*Start Scheduling*/
     setcontext(&dispatch_context);
 }
 
 void ParsedJson()
 {
-    struct json_object *parsed_json;//parse all file into object and get Threads
-    //object to save each thread
+    struct json_object *parsed_json;//parse all thread info to this object
+    /*thread object*/
     struct json_object *thread;
     struct json_object *name;
     struct json_object *entry;
@@ -435,7 +332,7 @@ void ParsedJson()
     size_t n_thread;//size of Threads
     size_t i;
     int p;//priority, in integer
-    int q;
+    int q;//entry function error handler
 
     parsed_json = json_object_from_file("init_threads.json");
     json_object_object_get_ex(parsed_json, "Threads", &parsed_json);
@@ -454,15 +351,15 @@ void ParsedJson()
         //change priority into integer
         switch(json_object_get_string(priority)[0])
         {
-        case 'H':
-            p = 2;
-            break;
-        case 'M':
-            p = 1;
-            break;
-        default:
-            p = 0;
-            break;
+            case 'H':
+                p = 2;
+                break;
+            case 'M':
+                p = 1;
+                break;
+            default:
+                p = 0;
+                break;
         }
         //Create thread structure and enqueue
         q = OS2021_ThreadCreate(json_object_get_string(name), json_object_get_string(entry), p, json_object_get_int(cancel));
