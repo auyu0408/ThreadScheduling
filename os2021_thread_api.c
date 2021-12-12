@@ -21,19 +21,34 @@ int tq[3] = {300, 200, 100};//time quantum value, tq[0] = low priority's time qu
 void enq(thread_tptr *new_th, thread_tptr *head)
 {
     thread_tptr temp = (*head);
+    thread_tptr temp_ex = NULL;
     if(temp!=NULL)
     {
-        while(temp->th_next != NULL)
+        while(temp != NULL)
         {
-            temp = temp->th_next;
+            if(temp->th_priority >= (*new_th)->th_priority)
+            {
+                temp_ex = temp;
+                temp = temp->th_next;
+            }
+            else
+            {
+                (*new_th)->th_next = temp;
+                if(temp != (*head))
+                    temp_ex->th_next = (*new_th);
+                else
+                    (*head) = (*new_th);
+                break;
+            }
         }
-        temp ->th_next = (*new_th);
+        if(temp == NULL)
+            temp_ex ->th_next = (*new_th);
     }
     else//empty queue
     {
         (*head) = (*new_th);
+        (*new_th)->th_next = NULL;
     }
-    (*new_th)->th_next = NULL;
     return;
 }
 

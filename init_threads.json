@@ -1,14 +1,14 @@
 {
 	"Threads":[
 		{
-			"name" : "f5",
-			"entry function" : "Function5",
+			"name" : "f1",
+			"entry function" : "Function1",
 			"priority": "M",
 			"cancel mode": "1"
 		},
 		{
-			"name" : "f4",
-			"entry function" : "Function4",
+			"name" : "f3",
+			"entry function" : "Function3",
 			"priority": "M",
 			"cancel mode": "0"
 		}
