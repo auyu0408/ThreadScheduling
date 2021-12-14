@@ -1,16 +1,9 @@
 #ifndef OS2021_API_H
 #define OS2021_API_H
 
-#define STACK_SIZE 8192
+#include "all_include.h"
 
-#include <sys/time.h>
-#include <signal.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <string.h>
-#include <json-c/json.h>
-#include "function_libary.h"
-#include "self_thread.h"
+#define STACK_SIZE 8192
 
 /*API*/
 int OS2021_ThreadCreate(char *job_name, char *p_function, char *priority, int cancel_mode);
@@ -27,7 +20,6 @@ void Timer_Handler();
 void Scheduler();
 void Dispatcher();
 void StartSchedulingSimulation();
-void ParsedJson();
 void Report(int signal);
 
 #endif
