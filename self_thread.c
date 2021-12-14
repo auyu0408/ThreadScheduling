@@ -1,4 +1,4 @@
-#include "self_thread.h"
+#include "all_include.h"
 
 thread_tptr create_thread(char *job_name, int th_id, char *priority, int cancel_mode)
 {

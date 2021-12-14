@@ -1,9 +1,7 @@
 #ifndef SELF_THREAD_H
 #define SELF_THREAD_H
 
-#include <ucontext.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include"all_include.h"
 
 /*self thread structure*/
 struct thread
