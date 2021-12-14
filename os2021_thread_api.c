@@ -2,9 +2,9 @@
 
 struct itimerval Signaltimer;
 ucontext_t dispatch_context;//dispatcher context
-ucontext_t finish_context;//if function will goto end.
 int th_num = 0;//total thread_id
 long time_past = 0;//time quantum
+int dispatching = 0;//to check if you are dispatching or not, to avoid duplicated dispatching
 
 thread_tptr run = NULL;
 /*priority feedback queue head*/
@@ -22,15 +22,15 @@ int OS2021_ThreadCreate(char *job_name, char *p_function, char *priority, int ca
     th_num++;
 
     if(strcmp(p_function, "Function1") == 0)
-        CreateContext(&(new_th->th_ctx), &finish_context, &Function1);
+        CreateContext(&(new_th->th_ctx), &dispatch_context, &Function1);
     else if(strcmp(p_function, "Function2") == 0)
-        CreateContext(&(new_th->th_ctx), &finish_context, &Function2);
+        CreateContext(&(new_th->th_ctx), &dispatch_context, &Function2);
     else if(strcmp(p_function, "Function3") == 0)
-        CreateContext(&(new_th->th_ctx), &finish_context, &Function3);
+        CreateContext(&(new_th->th_ctx), &dispatch_context, &Function3);
     else if(strcmp(p_function, "Function4") == 0)
-        CreateContext(&(new_th->th_ctx), &finish_context, &Function4);
+        CreateContext(&(new_th->th_ctx), &dispatch_context, &Function4);
     else if(strcmp(p_function, "Function5") == 0)
-        CreateContext(&(new_th->th_ctx), &finish_context, &Function5);
+        CreateContext(&(new_th->th_ctx), &dispatch_context, &Function5);
     else if(strcmp(p_function, "ResourceReclaim") == 0)
         CreateContext(&(new_th->th_ctx), NULL, &ResourceReclaim);
     else
@@ -206,6 +206,8 @@ void ResetTimer()
 
 void TimerHandler()
 {
+    if(dispatching == 1)
+        return;
     time_past += 10;
     //calculate related time
     thread_tptr temp_th = ready_head;
@@ -242,6 +244,7 @@ void TimerHandler()
     //if time excess time quantum, change another thread
     if(time_past >= tq[run->th_priority])
     {
+        dispatching = 1;//going to dispatch, you can't do enqueue twice
         //change priority
         if(run->th_priority !=0)
         {
@@ -281,26 +284,14 @@ void Report(int signal)
     return;
 }
 
-void Scheduler()
-{
-    run = deq(&ready_head);
-}
-
 void Dispatcher()
 {
-    run = NULL;
-    Scheduler();
+    dispatching = 1;
+    run = deq(&ready_head);
     time_past = 0;
+    dispatching = 0;
     ResetTimer();
     setcontext(&(run->th_ctx));
-}
-
-void FinishThread()
-{
-    thread_tptr target = run;
-    run = NULL;
-    enq(&target, &terminate_head);//change from run to terminate state
-    setcontext(&dispatch_context);//reschedule
 }
 
 void StartSchedulingSimulation()
@@ -312,7 +303,6 @@ void StartSchedulingSimulation()
     signal(SIGTSTP, Report);
     /*Create Context*/
     CreateContext(&dispatch_context, NULL, &Dispatcher);
-    CreateContext(&finish_context, &dispatch_context, &FinishThread);
     /*Create thread*/
     OS2021_ThreadCreate("reclaimer", "ResourceReclaim", "L", 1);
     ParsedJson();
