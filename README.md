@@ -1,4 +1,4 @@
-# OS2021_Hw3_Template
+# ThreadScheduling
 
 * [requirements](https://docs.google.com/presentation/d/1UFuPUwd17Hogh5Vp8GZbnrLRAddGvC1j/edit#slide=id.p3)
 
@@ -9,6 +9,7 @@
 - self_thread.h, self_thread.c -> Self define data structure and related function
 - simulator.c -> main source
 - init_threads.json -> Thread configuration file
+- parsed_json.h, parsed_json.c -> Function to parsed init_threads.json file and CreateThread
 
 ## Building the Project
 
@@ -30,7 +31,7 @@ make
 make simulator
 ```
 
-- delete all output expect `simulator`
+- delete all output file
 
 ```bash
 make clean
@@ -47,7 +48,7 @@ make clean
 - Use `Ctrl`+`Z` to reports thread information 
 - Use `Ctrl`+`C` to terminate the process
 
-```bash
+```
 f1 wants to waiting for event 3
 The priority of thread f1 is changed from M to H
 f3 wants to waiting for event 3
@@ -134,3 +135,5 @@ Head -> 2 -> 5 -> 3 -> 4 -> 1 -> 6
 - [signal handler](https://calvinkam.github.io/csci3150-Fall17-lab-pipes-signal/custom-signal-handler.html)
 
 - [timer](https://www.ibm.com/docs/en/i/7.3?topic=ssw_ibm_i_73/apis/setitime.htm)
+
+- [跟我一起寫Makefile](https://seisman.github.io/how-to-write-makefile/index.html)
