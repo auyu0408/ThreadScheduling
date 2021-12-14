@@ -1,4 +1,4 @@
-#include "function_libary.h"
+#include "all_include.h"
 
 void Function1(void)
 {
