@@ -124,6 +124,7 @@ The memory space by random_1 has been released.
 - The two thing we considerate in our queue is: 1.Thread's priority 2. Enter order  
   - If their priority is different, high priority serve first
   - Else, first come first serve
+- And each time when I want to enqueue a thread into ready queue, I need to notice that if I duplicate enqueue since timer alarm again.
 
 - If the input order is: 1.L 2.H 3.M 4.M 5.H 6.L, the thread in queue be like:   
 Head -> 2 -> 5 -> 3 -> 4 -> 1 -> 6  
