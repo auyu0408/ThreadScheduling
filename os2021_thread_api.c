@@ -4,7 +4,6 @@ struct itimerval Signaltimer;
 ucontext_t dispatch_context;//dispatcher context
 int th_num = 0;//total thread_id
 long time_past = 0;//time quantum
-int dispatching = 0;//to check if you are dispatching or not, to avoid duplicated dispatching
 
 thread_tptr run = NULL;
 /*priority feedback queue head*/
@@ -199,15 +198,11 @@ void ResetTimer()
     Signaltimer.it_value.tv_sec = 0;
     Signaltimer.it_value.tv_usec = 10000;
     if(setitimer(ITIMER_REAL, &Signaltimer, NULL) < 0)
-    {
         printf("ERROR SETTING TIME SIGALRM!\n");
-    }
 }
 
 void TimerHandler()
 {
-    if(dispatching == 1)
-        return;
     time_past += 10;
     //calculate related time
     thread_tptr temp_th = ready_head;
@@ -244,7 +239,6 @@ void TimerHandler()
     //if time excess time quantum, change another thread
     if(time_past >= tq[run->th_priority])
     {
-        dispatching = 1;//going to dispatch, you can't do enqueue twice
         //change priority
         if(run->th_priority !=0)
         {
@@ -286,18 +280,16 @@ void Report(int signal)
 
 void Dispatcher()
 {
-    dispatching = 1;
     run = deq(&ready_head);
     time_past = 0;
-    dispatching = 0;
     ResetTimer();
     setcontext(&(run->th_ctx));
 }
 
 void StartSchedulingSimulation()
 {
-    /*Set Timer*/
-    Signaltimer.it_interval.tv_usec = 100;
+    /*Set Timer and Interrupt*/
+    Signaltimer.it_interval.tv_usec = 0;
     Signaltimer.it_interval.tv_sec = 0;
     signal(SIGALRM, TimerHandler);
     signal(SIGTSTP, Report);
