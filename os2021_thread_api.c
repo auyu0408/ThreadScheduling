@@ -49,7 +49,6 @@ void OS2021_ThreadCancel(char *job_name)
     thread_tptr ex_th = NULL;
     if(strcmp("reclaimer", job_name)==0)
         return;//reclaimer can't enter terminate state
-
     /*tried to find target in ready queue or wait queue */
     while (temp_th!=NULL)
     {
@@ -80,6 +79,23 @@ void OS2021_ThreadCancel(char *job_name)
                 ex_th = temp_th;
                 temp_th = temp_th->th_next;
             }
+        }
+    }
+    if(target == NULL)
+    {
+        temp_th = run;
+        if(strcmp(temp_th->th_name, job_name)==0)
+        {
+            target = temp_th;
+            if(target->th_cancelmode == 0)
+                enq(&target, &terminate_head);
+            else
+            {
+                target->th_cancel_status = 1;
+                printf("%s wants to cancel thread %s\n", run->th_name, target->th_name);
+                return;
+            }
+            swapcontext(&(target->th_ctx), &dispatch_context);
         }
     }
     /*if find target, move it to terminate queue or change state*/
