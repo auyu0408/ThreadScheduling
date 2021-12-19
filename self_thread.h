@@ -12,7 +12,7 @@ struct thread
     int b_priority;//original priority
     int th_priority;//current priority
     int th_cancelmode;//0=asynchronous, 1=deffer(notice: reclaimer can't goto the end)
-    int th_cancel_status;//0=nothing, 1=waiting cancel
+    int th_cbit;
     int th_wait;//event I want wait(0~7), -1 = no waiting
     long th_qtime;//queueing time
     long th_wtime;//waiting time

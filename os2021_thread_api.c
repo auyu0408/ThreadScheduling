@@ -87,34 +87,35 @@ void OS2021_ThreadCancel(char *job_name)
         if(strcmp(temp_th->th_name, job_name)==0)
         {
             target = temp_th;
+            target->th_cbit = 1;
             if(target->th_cancelmode == 0)
                 enq(&target, &terminate_head);
             else
             {
-                target->th_cancel_status = 1;
                 printf("%s wants to cancel thread %s\n", run->th_name, target->th_name);
                 return;
             }
             swapcontext(&(target->th_ctx), &dispatch_context);
         }
     }
-    /*if find target, move it to terminate queue or change state*/
+    /*if find target(not running), move it to terminate queue or change state*/
     if(target != NULL)
     {
+        target->th_cbit = 1;
         if(target->th_cancelmode == 0)
         {
             /*dequeue from original queue*/
             if(target == wait_head)
                 wait_head = target->th_next;
+            else if(target == ready_head)
+                ready_head = target->th_next;
             else
                 ex_th->th_next = target->th_next;
+            printf("%s cancel thread %s\n", run->th_name, target->th_name);
             enq(&target, &terminate_head);//enqueue to terminate queue
         }
         else
-        {
-            target->th_cancel_status = 1;//change cancel state but not goto terminate now, wait for cancel point
             printf("%s wants to cancel thread %s\n", run->th_name, target->th_name);
-        }
     }
     return;
 }
@@ -189,14 +190,11 @@ void OS2021_DeallocateThreadResource()
 
 void OS2021_TestCancel()
 {
-    thread_t *target = run;
-    if(target->th_cancel_status == 1)//change when it was cancel by somebody
+    if((run->th_cbit))//change when it was cancel by somebody
     {
-        enq(&target, &terminate_head);//change to terminate state
-        setcontext(&dispatch_context);//reschedule
+        enq(&run, &terminate_head);//change to terminate state
+        setcontext(&dispatch_context);
     }
-    else
-        return;
 }
 
 void CreateContext(ucontext_t *context, ucontext_t *next_context, void *func)
@@ -255,13 +253,18 @@ void TimerHandler()
     //if time excess time quantum, change another thread
     if(time_past >= tq[run->th_priority])
     {
+        if(run->th_cbit == 1)
+            enq(&run, &terminate_head);
         //change priority
-        if(run->th_priority !=0)
+        else
         {
-            run->th_priority--;
-            printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
+            if(run->th_priority !=0)
+            {
+                run->th_priority--;
+                printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
+            }
+            enq(&run, &ready_head);//send it to ready queue
         }
-        enq(&run, &ready_head);//send it to ready queue
         swapcontext(&(run->th_ctx), &dispatch_context);//reschedule
     }
     //if not execeed, keep going
