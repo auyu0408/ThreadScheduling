@@ -87,7 +87,7 @@ void OS2021_ThreadCancel(char *job_name)
         if(strcmp(temp_th->th_name, job_name)==0)
         {
             target = temp_th;
-            target->th_cbit = 1;
+            target->th_cancel_status = 1;
             if(target->th_cancelmode == 0)
                 enq(&target, &terminate_head);
             else
@@ -101,7 +101,7 @@ void OS2021_ThreadCancel(char *job_name)
     /*if find target(not running), move it to terminate queue or change state*/
     if(target != NULL)
     {
-        target->th_cbit = 1;
+        target->th_cancel_status = 1;
         if(target->th_cancelmode == 0)
         {
             /*dequeue from original queue*/
@@ -190,7 +190,7 @@ void OS2021_DeallocateThreadResource()
 
 void OS2021_TestCancel()
 {
-    if((run->th_cbit))//change when it was cancel by somebody
+    if((run->th_cancel_status))//change when it was cancel by somebody
     {
         enq(&run, &terminate_head);//change to terminate state
         setcontext(&dispatch_context);
@@ -253,18 +253,13 @@ void TimerHandler()
     //if time excess time quantum, change another thread
     if(time_past >= tq[run->th_priority])
     {
-        if(run->th_cbit == 1)
-            enq(&run, &terminate_head);
         //change priority
-        else
+        if(run->th_priority !=0)
         {
-            if(run->th_priority !=0)
-            {
-                run->th_priority--;
-                printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
-            }
-            enq(&run, &ready_head);//send it to ready queue
+            run->th_priority--;
+            printf("The priority of thread %s is changed from %c to %c\n", run->th_name, priority_char[run->th_priority+1], priority_char[run->th_priority]);
         }
+        enq(&run, &ready_head);//send it to ready queue
         swapcontext(&(run->th_ctx), &dispatch_context);//reschedule
     }
     //if not execeed, keep going

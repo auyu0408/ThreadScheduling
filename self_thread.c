@@ -22,7 +22,7 @@ thread_tptr create_thread(char *job_name, int th_id, char *priority, int cancel_
     new_th->th_id = th_id;//th_id = th_num(original), th_num = th_num+1
     new_th->b_priority = new_th->th_priority = p;
     new_th->th_cancelmode = cancel_mode;
-    new_th->th_cbit = 0;
+    new_th->th_cancel_status = 0;
     new_th->th_wait = -1;
     new_th->th_qtime = 0;
     new_th->th_wtime = 0;
