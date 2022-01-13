@@ -123,6 +123,7 @@ void OS2021_ThreadCancel(char *job_name)
 void OS2021_ThreadWaitEvent(int event_id)
 {
     thread_t *target = run;
+    if(event_id>7) return;
     target->th_wait = event_id;
     printf("%s wants to waiting for event %d\n", target->th_name, event_id);
     priority_change(&target, time_past, tq[target->th_priority]);//change priority
