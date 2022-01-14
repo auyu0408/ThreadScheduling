@@ -92,7 +92,7 @@ The memory space by random_1 has been released.
 ## Test
 
 There has 2 types case to test the `os2021_thread_api.c`, which is `function_library0.c` + `init_thread0.json` and `function_library1.c` + `init_thread1.json`  
-You could replace the original file with them. 
+You could replace the original file with them.  
 You could also design your own function library and init_thread, don;t forget to include `all_include.h`  
 And the test case is modified from [
 OS2021_Hw3_Template](https://github.com/TsenEn-Chou/OS2021_Hw3_Template) by  [TsenEn-Chou](https://github.com/TsenEn-Chou)
